@@ -1394,6 +1394,7 @@ public:
     virtual ~JoinBase() = default;
     virtual void toString(std::string& query) const = 0;
     [[nodiscard]] virtual std::string toString() const = 0;
+    [[nodiscard]] virtual std::unique_ptr<JoinBase> clone() const = 0;
 };
 
 // Join class
@@ -1410,23 +1411,6 @@ public:
 
     Join(Type type, std::string_view table, std::string_view condition)
         : type_(type), table_(table), condition_(condition) {}
-
-    Join(Join &&other)
-        : type_(other.type_)
-        , table_(other.table_)
-        , condition_(other.condition_)
-    {}
-
-    Join& operator=(Join&& other)
-    {
-        if (&other != this)
-        {
-            type_ = other.type_;
-            table_ = other.table_;
-            condition_ = other.condition_;
-        }
-        return *this;
-    }
 
     void toString(std::string& query) const {
         const char* type_str = "";
@@ -1451,6 +1435,10 @@ public:
         toString(result);
         return result;
     }
+
+    [[nodiscard]] std::unique_ptr<JoinBase> clone() const override {
+        return std::make_unique<Join>(*this);
+    }
 };
 
 // JoinSubquery class
@@ -1460,33 +1448,14 @@ public:
 private:
     Type type_;
     std::string subquery_;
-    std::string condition_;
     std::string alias_;
+    std::string condition_;
 
 public:
     JoinSubquery() = default;
 
     JoinSubquery(Type type, std::string_view subquery, std::string_view alias, std::string_view condition)
         : type_(type), subquery_(subquery), alias_(alias), condition_(condition) {}
-
-    JoinSubquery(JoinSubquery &&other)
-        : type_(other.type_)
-        , subquery_(other.subquery_)
-        , alias_(other.alias_)
-        , condition_(other.condition_)
-    {}
-
-    JoinSubquery& operator=(JoinSubquery&& other)
-    {
-        if (&other != this)
-        {
-            type_ = other.type_;
-            subquery_ = other.subquery_;
-            alias_ = other.alias_;
-            condition_ = other.condition_;
-        }
-        return *this;
-    }
 
     void toString(std::string& query) const {
         const char* type_str = "";
@@ -1512,6 +1481,10 @@ public:
         result.reserve(subquery_.size() + condition_.size() + 20);
         toString(result);
         return result;
+    }
+
+    [[nodiscard]] std::unique_ptr<JoinBase> clone() const override {
+        return std::make_unique<JoinSubquery>(*this);
     }
 };
 
@@ -1638,11 +1611,72 @@ private:
     } columns_;
 
     // Conditions and joins (medium-frequency access)
-    struct {
+    struct Filters {
         std::array<Condition<Config>, Config::MaxConditions> where_conditions{};
         size_t where_conditions_count{0};
         std::array<std::unique_ptr<JoinBase>, Config::MaxJoins> joins{};
         size_t joins_count{0};
+
+        Filters(){}
+        Filters(const Filters& other)
+            : where_conditions(other.where_conditions)
+            , where_conditions_count(other.where_conditions_count)
+            , joins_count(other.joins_count)
+        {
+            for (size_t i = 0; i < joins_count; ++i) {
+                if (other.joins[i]) {
+                    joins[i] = other.joins[i]->clone();
+                }
+            }
+        }
+
+        Filters(Filters&& other) noexcept
+            : where_conditions(std::move(other.where_conditions))
+            , where_conditions_count(other.where_conditions_count)
+            , joins(std::move(other.joins))
+            , joins_count(other.joins_count)
+        {
+            other.where_conditions_count = 0;
+            other.joins_count = 0;
+        }
+
+        Filters& operator=(const Filters& other)
+        {
+            if (this == &other)
+                return *this;
+
+            where_conditions = other.where_conditions;
+            where_conditions_count = other.where_conditions_count;
+            joins_count = other.joins_count;
+
+            for (size_t i = 0; i < joins_count; ++i) {
+                joins[i] = other.joins[i]
+                    ? other.joins[i]->clone()
+                    : nullptr;
+            }
+
+            for (size_t i = joins_count; i < Config::MaxJoins; ++i) {
+                joins[i].reset();
+            }
+
+            return *this;
+        }
+
+        Filters& operator=(Filters&& other) noexcept
+        {
+            if (this == &other)
+                return *this;
+
+            where_conditions = std::move(other.where_conditions);
+            where_conditions_count = other.where_conditions_count;
+            joins = std::move(other.joins);
+            joins_count = other.joins_count;
+
+            other.where_conditions_count = 0;
+            other.joins_count = 0;
+
+            return *this;
+        }
     } filters_;
 
     // Ordering, grouping, and limits (low-frequency access)
