@@ -686,5 +686,23 @@ int main() {
         std::cout << query2 << std::endl;
     }
 
+    {
+        printSection("Nested Query in JOIN");
+        auto query = sql::QueryBuilder()
+        .select("*"sv)
+        .from("procedures p"sv)
+        .innerJoin([](auto& b) {
+            b.select(
+                "id",
+                max("version").as("max_version")
+            )
+            .from("procedures")
+            .groupBy("id");
+        }, "latest",
+        "p.id = latest.id")
+        .build();
+
+        std::cout << query << std::endl;
+    }
     return 0;
 }

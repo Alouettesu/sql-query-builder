@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <memory>
 
 // Optional Qt support
 #ifdef SQLQUERYBUILDER_USE_QT
@@ -1387,11 +1388,17 @@ public:
     }
 };
 
-// Join class
-template<typename Config>
-class Join {
+class JoinBase {
 public:
     enum class Type : uint8_t { Inner, Left, Right, Full, Cross };
+    virtual ~JoinBase() = default;
+    virtual void toString(std::string& query) const = 0;
+    [[nodiscard]] virtual std::string toString() const = 0;
+};
+
+// Join class
+template<typename Config>
+class Join : public JoinBase {
 
 private:
     Type type_;
@@ -1403,6 +1410,23 @@ public:
 
     Join(Type type, std::string_view table, std::string_view condition)
         : type_(type), table_(table), condition_(condition) {}
+
+    Join(Join &&other)
+        : type_(other.type_)
+        , table_(other.table_)
+        , condition_(other.condition_)
+    {}
+
+    Join& operator=(Join&& other)
+    {
+        if (&other != this)
+        {
+            type_ = other.type_;
+            table_ = other.table_;
+            condition_ = other.condition_;
+        }
+        return *this;
+    }
 
     void toString(std::string& query) const {
         const char* type_str = "";
@@ -1424,6 +1448,68 @@ public:
     [[nodiscard]] std::string toString() const {
         std::string result;
         result.reserve(table_.size() + condition_.size() + 20);
+        toString(result);
+        return result;
+    }
+};
+
+// JoinSubquery class
+template<typename Config>
+class JoinSubquery : public JoinBase {
+public:
+private:
+    Type type_;
+    std::string subquery_;
+    std::string condition_;
+    std::string alias_;
+
+public:
+    JoinSubquery() = default;
+
+    JoinSubquery(Type type, std::string_view subquery, std::string_view alias, std::string_view condition)
+        : type_(type), subquery_(subquery), alias_(alias), condition_(condition) {}
+
+    JoinSubquery(JoinSubquery &&other)
+        : type_(other.type_)
+        , subquery_(other.subquery_)
+        , alias_(other.alias_)
+        , condition_(other.condition_)
+    {}
+
+    JoinSubquery& operator=(JoinSubquery&& other)
+    {
+        if (&other != this)
+        {
+            type_ = other.type_;
+            subquery_ = other.subquery_;
+            alias_ = other.alias_;
+            condition_ = other.condition_;
+        }
+        return *this;
+    }
+
+    void toString(std::string& query) const {
+        const char* type_str = "";
+        switch (type_) {
+        case Type::Inner: type_str = "INNER JOIN"; break;
+        case Type::Left:  type_str = "LEFT JOIN"; break;
+        case Type::Right: type_str = "RIGHT JOIN"; break;
+        case Type::Full:  type_str = "FULL JOIN"; break;
+        case Type::Cross: type_str = "CROSS JOIN"; break;
+        }
+
+        query += type_str;
+        query += " (";
+        query += subquery_;
+        query += ") ";
+        query += alias_; 
+        query += " ON ";
+        query += condition_;
+    }
+
+    [[nodiscard]] std::string toString() const {
+        std::string result;
+        result.reserve(subquery_.size() + condition_.size() + 20);
         toString(result);
         return result;
     }
@@ -1555,7 +1641,7 @@ private:
     struct {
         std::array<Condition<Config>, Config::MaxConditions> where_conditions{};
         size_t where_conditions_count{0};
-        std::array<Join<Config>, Config::MaxJoins> joins{};
+        std::array<std::unique_ptr<JoinBase>, Config::MaxJoins> joins{};
         size_t joins_count{0};
     } filters_;
 
@@ -1925,14 +2011,14 @@ public:
         }
 
         if constexpr (std::is_convertible_v<T, std::string_view>) {
-            filters_.joins[filters_.joins_count++] = Join<Config>{
-                Join<Config>::Type::Inner,
+            filters_.joins[filters_.joins_count++] = std::make_unique<Join<Config>>(
+                JoinBase::Type::Inner,
                 static_cast<std::string_view>(table),
                 condition
-            };
+            );
         } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, AliasedTable<Config>>) {
             filters_.joins[filters_.joins_count++] = Join<Config>{
-                Join<Config>::Type::Inner,
+                JoinBase::Type::Inner,
                 table.toString(),
                 condition
             };
@@ -1949,6 +2035,32 @@ public:
         return innerJoin(table, condition.toString());
     }
 
+    template<typename Fn, typename Config=DefaultConfig>
+    QueryBuilder& innerJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
+        static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
+        if (filters_.joins_count >= Config::MaxJoins) {
+            auto error = QueryError(QueryError::Code::TooManyJoins,
+                                    std::format("Too many joins: limit is {}", Config::MaxJoins));
+            last_error_ = error;
+            if constexpr(Config::ThrowOnError) {
+                throw error;
+            }
+            return *this;
+        }
+
+        QueryBuilder<Config> builder;
+        builderFn(builder);
+        Result<std::string> r = builder.buildResult();
+        std::string subquery = r.value();
+        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Config>>(
+            JoinBase::Type::Inner,
+            subquery,
+            alias,
+            condition
+        );
+        return *this;
+    }
+
     template<typename T>
     QueryBuilder& leftJoin(const T& table, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
@@ -1963,17 +2075,17 @@ public:
         }
 
         if constexpr (std::is_convertible_v<T, std::string_view>) {
-            filters_.joins[filters_.joins_count++] = Join<Config>{
-                Join<Config>::Type::Left,
+            filters_.joins[filters_.joins_count++] = std::make_unique<Join<Config>>(
+                JoinBase::Type::Left,
                 static_cast<std::string_view>(table),
                 condition
-            };
+            );
         } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, AliasedTable<Config>>) {
-            filters_.joins[filters_.joins_count++] = Join<Config>{
-                Join<Config>::Type::Left,
+            filters_.joins[filters_.joins_count++] = std::make_unique<Join<Config>>(
+                JoinBase::Type::Left,
                 table.toString(),
                 condition
-            };
+            );
         } else {
             static_assert(std::is_convertible_v<T, std::string_view> ||
                               std::is_same_v<std::remove_cvref_t<T>, AliasedTable<Config>>,
@@ -1985,6 +2097,32 @@ public:
     template<typename T>
     QueryBuilder& leftJoin(const T& table, const Condition<Config>& condition) {
         return leftJoin(table, condition.toString());
+    }
+
+    template<typename Fn, typename Config=DefaultConfig>
+    QueryBuilder& leftJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
+        static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
+        if (filters_.joins_count >= Config::MaxJoins) {
+            auto error = QueryError(QueryError::Code::TooManyJoins,
+                                    std::format("Too many joins: limit is {}", Config::MaxJoins));
+            last_error_ = error;
+            if constexpr(Config::ThrowOnError) {
+                throw error;
+            }
+            return *this;
+        }
+
+        QueryBuilder<Config> builder;
+        builderFn(builder);
+        Result<std::string> r = builder.buildResult();
+        std::string subquery = r.value();
+        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Config>>(
+            JoinBase::Type::Left,
+            subquery,
+            alias,
+            condition
+        );
+        return *this;
     }
 
     template<typename T>
@@ -2001,17 +2139,17 @@ public:
         }
 
         if constexpr (std::is_convertible_v<T, std::string_view>) {
-            filters_.joins[filters_.joins_count++] = Join<Config>{
-                Join<Config>::Type::Right,
+            filters_.joins[filters_.joins_count++] = std::make_unique<Join<Config>>(
+                JoinBase::Type::Right,
                 static_cast<std::string_view>(table),
                 condition
-            };
+            );
         } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, AliasedTable<Config>>) {
-            filters_.joins[filters_.joins_count++] = Join<Config>{
-                Join<Config>::Type::Right,
+            filters_.joins[filters_.joins_count++] = std::make_unique<Join<Config>>(
+                JoinBase::Type::Right,
                 table.toString(),
                 condition
-            };
+            );
         } else {
             static_assert(std::is_convertible_v<T, std::string_view> ||
                               std::is_same_v<std::remove_cvref_t<T>, AliasedTable<Config>>,
@@ -2023,6 +2161,32 @@ public:
     template<typename T>
     QueryBuilder& rightJoin(const T& table, const Condition<Config>& condition) {
         return rightJoin(table, condition.toString());
+    }
+
+    template<typename Fn, typename Config=DefaultConfig>
+    QueryBuilder& rightJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
+        static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
+        if (filters_.joins_count >= Config::MaxJoins) {
+            auto error = QueryError(QueryError::Code::TooManyJoins,
+                                    std::format("Too many joins: limit is {}", Config::MaxJoins));
+            last_error_ = error;
+            if constexpr(Config::ThrowOnError) {
+                throw error;
+            }
+            return *this;
+        }
+
+        QueryBuilder<Config> builder;
+        builderFn(builder);
+        Result<std::string> r = builder.buildResult();
+        std::string subquery = r.value();
+        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Config>>(
+            JoinBase::Type::Right,
+            subquery,
+            alias,
+            condition
+        );
+        return *this;
     }
 
     template<typename T>
@@ -2039,14 +2203,14 @@ public:
         }
 
         if constexpr (std::is_convertible_v<T, std::string_view>) {
-            filters_.joins[filters_.joins_count++] = Join<Config>{
-                Join<Config>::Type::Full,
+            filters_.joins[filters_.joins_count++] = std::make_unique<Join<Config>>(
+                JoinBase::Type::Full,
                 static_cast<std::string_view>(table),
                 condition
-            };
+            );
         } else if constexpr (std::is_same_v<std::remove_cvref_t<T>, AliasedTable<Config>>) {
             filters_.joins[filters_.joins_count++] = Join<Config>{
-                Join<Config>::Type::Full,
+                JoinBase::Type::Full,
                 table.toString(),
                 condition
             };
@@ -2061,6 +2225,32 @@ public:
     template<typename T>
     QueryBuilder& fullJoin(const T& table, const Condition<Config>& condition) {
         return fullJoin(table, condition.toString());
+    }
+
+    template<typename Fn, typename Config=DefaultConfig>
+    QueryBuilder& fullJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
+        static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
+        if (filters_.joins_count >= Config::MaxJoins) {
+            auto error = QueryError(QueryError::Code::TooManyJoins,
+                                    std::format("Too many joins: limit is {}", Config::MaxJoins));
+            last_error_ = error;
+            if constexpr(Config::ThrowOnError) {
+                throw error;
+            }
+            return *this;
+        }
+
+        QueryBuilder<Config> builder;
+        builderFn(builder);
+        Result<std::string> r = builder.buildResult();
+        std::string subquery = r.value();
+        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Config>>(
+            JoinBase::Type::Full,
+            subquery,
+            alias,
+            condition
+        );
+        return *this;
     }
 
     // Where variations
@@ -2361,7 +2551,7 @@ private:
         // Joins
         for (size_t i = 0; i < filters_.joins_count; ++i) {
             query += " ";
-            filters_.joins[i].toString(query);
+            filters_.joins[i]->toString(query);
         }
 
         // Where
