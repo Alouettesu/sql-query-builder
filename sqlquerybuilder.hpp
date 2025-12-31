@@ -464,7 +464,9 @@ public:
                 return std::format("'{}'", value.toString(Qt::ISODate).toStdString());
 #endif
             }
-            return std::string(keywords::NULL_VALUE); // Fallback
+            else {
+                static_assert(false, "It seems some new type appear in StorageType, but not well processed.");   // Fallback
+            }
         }, storage_);
     }
 
