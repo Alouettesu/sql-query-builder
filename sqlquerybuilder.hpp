@@ -75,6 +75,13 @@ inline constexpr std::string_view ALL = "*";
 inline constexpr std::string_view GROUP_CONCAT = "GROUP_CONCAT";
 }
 
+enum class PlaceholderStyle {
+    QuestionMark,  // ?
+    Dollar,        // $1, $2, etc.
+    Colon,         // :name
+    At             // @name
+};
+
 // Configuration
 struct DefaultConfig {
     static constexpr size_t MaxColumns = 32;
@@ -84,6 +91,7 @@ struct DefaultConfig {
     static constexpr size_t MaxGroupBy = 8;
     static constexpr size_t MaxInValues = 16;
     static constexpr bool ThrowOnError = false;
+    static constexpr PlaceholderStyle DefaultPlaceholderStyle = PlaceholderStyle::Colon;
 };
 
 // Error handling
@@ -182,6 +190,7 @@ concept QueryConfig =
         requires std::same_as<decltype(T::MaxGroupBy),    const std::size_t>;
         requires std::same_as<decltype(T::MaxInValues),   const std::size_t>;
         requires std::same_as<decltype(T::ThrowOnError),  const bool>;
+        requires std::same_as<decltype(T::DefaultPlaceholderStyle), const PlaceholderStyle>;
     };
 
 // Forward declarations
@@ -1505,38 +1514,37 @@ template <typename Config>
 class Placeholder {
 private:
     std::string name_;
-    enum class Style {
-        QuestionMark,  // ?
-        Dollar,        // $1, $2, etc.
-        Colon,         // :name
-        At             // @name
-    };
-    Style style_;
+    PlaceholderStyle style_;
 
 public:
     explicit Placeholder(std::string_view name = "")
         : name_(name) {
-        if (name.empty()) {
-            style_ = Style::QuestionMark;
+        if (name.empty() || name[0] == '?') {
+            style_ = PlaceholderStyle::QuestionMark;
         } else if (name[0] == ':') {
-            style_ = Style::Colon;
+            style_ = PlaceholderStyle::Colon;
         } else if (name[0] == '@') {
-            style_ = Style::At;
+            style_ = PlaceholderStyle::At;
         } else if (name[0] == '$') {
-            style_ = Style::Dollar;
+            style_ = PlaceholderStyle::Dollar;
         } else {
-            style_ = Style::Colon;
-            name_ = ":" + std::string(name);
+            style_ = Config::DefaultPlaceholderStyle;
+            if (style_ == PlaceholderStyle::Colon)
+                name_ = ":" + std::string(name);
+            else if (style_ == PlaceholderStyle::At)
+                name_ = "@" + std::string(name);
+            else if (style_ == PlaceholderStyle::Dollar)
+                name_ = "$" + std::string(name);
         }
     }
 
     [[nodiscard]] std::string toString() const {
         switch (style_) {
-        case Style::QuestionMark:
+        case PlaceholderStyle::QuestionMark:
             return "?";
-        case Style::Dollar:
-        case Style::Colon:
-        case Style::At:
+        case PlaceholderStyle::Dollar:
+        case PlaceholderStyle::Colon:
+        case PlaceholderStyle::At:
             return name_;
         default:
             return "?";

@@ -13,6 +13,8 @@ struct MyConfig {
     static constexpr size_t MaxGroupBy = 16;
     static constexpr size_t MaxInValues = 32;
     static constexpr bool ThrowOnError = true;
+    static constexpr sql::PlaceholderStyle DefaultPlaceholderStyle = sql::PlaceholderStyle::At;
+
 };
 
 // Example enum types
