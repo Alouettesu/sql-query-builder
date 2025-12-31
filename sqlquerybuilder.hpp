@@ -194,26 +194,26 @@ concept QueryConfig =
     };
 
 // Forward declarations
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class SqlValue;
 
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class ConditionBase;
 
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class Condition;
 
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class Column;
 
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class AliasedTable;
 
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class Placeholder;
 
 // Table class with config awareness
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class Table {
 private:
     std::string_view name_;
@@ -229,7 +229,7 @@ public:
 };
 
 // AliasedTable for better join handling
-template<typename Config>
+template<QueryConfig Config>
 class AliasedTable {
 private:
     std::string_view table_;
@@ -250,13 +250,13 @@ public:
 };
 
 // Implementation of Table::as
-template<typename Config>
+template<QueryConfig Config>
 AliasedTable<Config> Table<Config>::as(std::string_view alias) const {
     return AliasedTable<Config>(name_, alias);
 }
 
 // TypedColumn class with config awareness
-template<typename T, typename Config = DefaultConfig>
+template<typename T, QueryConfig Config = DefaultConfig>
 class TypedColumn {
 private:
     std::string_view table_;
@@ -375,7 +375,7 @@ public:
 };
 
 // SqlValue class with type-safe storage
-template<typename Config>
+template<QueryConfig Config>
 class SqlValue {
 public:
     using StorageType = std::variant<
@@ -474,16 +474,16 @@ public:
     }
 };
 
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 inline SqlValue<Config> ph(std::string_view name = "") {
     return SqlValue<Config>(Placeholder<Config>(name));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 class Condition;
 
 // Base class for common condition operations
-template<typename Config>
+template<QueryConfig Config>
 class ConditionBase {
 public:
     enum class Op : uint8_t {
@@ -527,7 +527,7 @@ public:
 };
 
 // Primary Condition class
-template<typename Config>
+template<QueryConfig Config>
 class Condition : public ConditionBase<Config> {
 public:
     using typename ConditionBase<Config>::Op;
@@ -852,7 +852,7 @@ public:
 };
 
 // Expression template for delayed condition evaluation
-template<typename Left, typename Right, typename Op, typename Config = DefaultConfig>
+template<typename Left, typename Right, typename Op, QueryConfig Config = DefaultConfig>
 class ConditionExpression {
 private:
     Left left_;
@@ -892,7 +892,7 @@ public:
 };
 
 // Column class with non-template base implementation
-template<typename Config>
+template<QueryConfig Config>
 class Column {
     std::string_view name_;
 
@@ -1006,113 +1006,113 @@ public:
     }
 };
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 Condition<Config> TypedColumn<T, Config>::isNull() const {
     return Condition<Config>::isNull(name_);
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 Condition<Config> TypedColumn<T, Config>::isNotNull() const {
     return Condition<Config>::isNotNull(name_);
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<SqlCompatible U>
 Condition<Config> TypedColumn<T, Config>::eq(U&& value) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(name_, Op::Eq, SqlValue<Config>(std::forward<U>(value)));
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<typename OtherType, typename OtherConfig>
 Condition<Config> TypedColumn<T, Config>::eq(const TypedColumn<OtherType, OtherConfig>& other) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(table_, name_, Op::Eq, other.tableName(), other.name());
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<SqlCompatible U>
 Condition<Config> TypedColumn<T, Config>::ne(U&& value) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(name_, Op::Ne, SqlValue<Config>(std::forward<U>(value)));
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<typename OtherType, typename OtherConfig>
 Condition<Config> TypedColumn<T, Config>::ne(const TypedColumn<OtherType, OtherConfig>& other) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(table_, name_, Op::Ne, other.tableName(), other.name());
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<SqlCompatible U>
 Condition<Config> TypedColumn<T, Config>::lt(U&& value) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(name_, Op::Lt, SqlValue<Config>(std::forward<U>(value)));
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<typename OtherType, typename OtherConfig>
 Condition<Config> TypedColumn<T, Config>::lt(const TypedColumn<OtherType, OtherConfig>& other) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(table_, name_, Op::Lt, other.tableName(), other.name());
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<SqlCompatible U>
 Condition<Config> TypedColumn<T, Config>::le(U&& value) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(name_, Op::Le, SqlValue<Config>(std::forward<U>(value)));
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<typename OtherType, typename OtherConfig>
 Condition<Config> TypedColumn<T, Config>::le(const TypedColumn<OtherType, OtherConfig>& other) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(table_, name_, Op::Le, other.tableName(), other.name());
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<SqlCompatible U>
 Condition<Config> TypedColumn<T, Config>::gt(U&& value) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(name_, Op::Gt, SqlValue<Config>(std::forward<U>(value)));
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<typename OtherType, typename OtherConfig>
 Condition<Config> TypedColumn<T, Config>::gt(const TypedColumn<OtherType, OtherConfig>& other) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(table_, name_, Op::Gt, other.tableName(), other.name());
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<SqlCompatible U>
 Condition<Config> TypedColumn<T, Config>::ge(U&& value) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(name_, Op::Ge, SqlValue<Config>(std::forward<U>(value)));
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<typename OtherType, typename OtherConfig>
 Condition<Config> TypedColumn<T, Config>::ge(const TypedColumn<OtherType, OtherConfig>& other) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(table_, name_, Op::Ge, other.tableName(), other.name());
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 Condition<Config> TypedColumn<T, Config>::like(std::string_view pattern) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(name_, Op::Like, SqlValue<Config>(pattern));
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 Condition<Config> TypedColumn<T, Config>::notLike(std::string_view pattern) const {
     using Op = typename ConditionBase<Config>::Op;
     return Condition<Config>(name_, Op::NotLike, SqlValue<Config>(pattern));
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<SqlCompatible T1, SqlCompatible T2>
 Condition<Config> TypedColumn<T, Config>::between(T1&& start, T2&& end) const {
     using Op = typename ConditionBase<Config>::Op;
@@ -1124,203 +1124,203 @@ Condition<Config> TypedColumn<T, Config>::between(T1&& start, T2&& end) const {
         );
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<typename U>
 Condition<Config> TypedColumn<T, Config>::in(std::span<const U> values) const {
     return Condition<Config>::in(name_, values);
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 template<typename U>
 Condition<Config> TypedColumn<T, Config>::notIn(std::span<const U> values) const {
     return Condition<Config>::notIn(name_, values);
 }
 
 // Operator overloads for TypedColumn
-template<typename T, typename Config, SqlCompatible U>
+template<typename T, QueryConfig Config, SqlCompatible U>
 inline Condition<Config> operator==(const TypedColumn<T, Config>& col, U&& val) {
     return col.eq(std::forward<U>(val));
 }
 
-template<typename T, typename U, typename ConfigT, typename ConfigU>
+template<typename T, typename U, QueryConfig ConfigT, QueryConfig ConfigU>
 inline Condition<ConfigT> operator==(const TypedColumn<T, ConfigT>& col1, const TypedColumn<U, ConfigU>& col2) {
     return col1.eq(col2);
 }
 
-template<typename T, typename Config, SqlCompatible U>
+template<typename T, QueryConfig Config, SqlCompatible U>
 inline Condition<Config> operator!=(const TypedColumn<T, Config>& col, U&& val) {
     return col.ne(std::forward<U>(val));
 }
 
-template<typename T, typename U, typename ConfigT, typename ConfigU>
+template<typename T, typename U, QueryConfig ConfigT, QueryConfig ConfigU>
 inline Condition<ConfigT> operator!=(const TypedColumn<T, ConfigT>& col1, const TypedColumn<U, ConfigU>& col2) {
     return col1.ne(col2);
 }
 
-template<typename T, typename Config, SqlCompatible U>
+template<typename T, QueryConfig Config, SqlCompatible U>
 inline Condition<Config> operator<(const TypedColumn<T, Config>& col, U&& val) {
     return col.lt(std::forward<U>(val));
 }
 
-template<typename T, typename U, typename ConfigT, typename ConfigU>
+template<typename T, typename U, QueryConfig ConfigT, QueryConfig ConfigU>
 inline Condition<ConfigT> operator<(const TypedColumn<T, ConfigT>& col1, const TypedColumn<U, ConfigU>& col2) {
     return col1.lt(col2);
 }
 
-template<typename T, typename Config, SqlCompatible U>
+template<typename T, QueryConfig Config, SqlCompatible U>
 inline Condition<Config> operator<=(const TypedColumn<T, Config>& col, U&& val) {
     return col.le(std::forward<U>(val));
 }
 
-template<typename T, typename U, typename ConfigT, typename ConfigU>
+template<typename T, typename U, QueryConfig ConfigT, QueryConfig ConfigU>
 inline Condition<ConfigT> operator<=(const TypedColumn<T, ConfigT>& col1, const TypedColumn<U, ConfigU>& col2) {
     return col1.le(col2);
 }
 
-template<typename T, typename Config, SqlCompatible U>
+template<typename T, QueryConfig Config, SqlCompatible U>
 inline Condition<Config> operator>(const TypedColumn<T, Config>& col, U&& val) {
     return col.gt(std::forward<U>(val));
 }
 
-template<typename T, typename U, typename ConfigT, typename ConfigU>
+template<typename T, typename U, QueryConfig ConfigT, QueryConfig ConfigU>
 inline Condition<ConfigT> operator>(const TypedColumn<T, ConfigT>& col1, const TypedColumn<U, ConfigU>& col2) {
     return col1.gt(col2);
 }
 
-template<typename T, typename Config, SqlCompatible U>
+template<typename T, QueryConfig Config, SqlCompatible U>
 inline Condition<Config> operator>=(const TypedColumn<T, Config>& col, U&& val) {
     return col.ge(std::forward<U>(val));
 }
 
-template<typename T, typename U, typename ConfigT, typename ConfigU>
+template<typename T, typename U, QueryConfig ConfigT, QueryConfig ConfigU>
 inline Condition<ConfigT> operator>=(const TypedColumn<T, ConfigT>& col1, const TypedColumn<U, ConfigU>& col2) {
     return col1.ge(col2);
 }
 
 // Operator overloads for Column
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator==(const Column<Config>& col, const SqlValue<Config>& val) {
     return col.eq(val);
 }
 
-template<typename Config, SqlCompatible T>
+template<QueryConfig Config, SqlCompatible T>
 inline Condition<Config> operator==(const Column<Config>& col, T&& val) {
     return col.eq(std::forward<T>(val));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator==(const Column<Config>& col, const std::string& val) {
     return col.eq(std::string_view(val));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator!=(const Column<Config>& col, const SqlValue<Config>& val) {
     return col.ne(val);
 }
 
-template<typename Config, SqlCompatible T>
+template<QueryConfig Config, SqlCompatible T>
 inline Condition<Config> operator!=(const Column<Config>& col, T&& val) {
     return col.ne(std::forward<T>(val));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator<(const Column<Config>& col, const SqlValue<Config>& val) {
     return col.lt(val);
 }
 
-template<typename Config, SqlCompatible T>
+template<QueryConfig Config, SqlCompatible T>
 inline Condition<Config> operator<(const Column<Config>& col, T&& val) {
     return col.lt(std::forward<T>(val));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator<=(const Column<Config>& col, const SqlValue<Config>& val) {
     return col.le(val);
 }
 
-template<typename Config, SqlCompatible T>
+template<QueryConfig Config, SqlCompatible T>
 inline Condition<Config> operator<=(const Column<Config>& col, T&& val) {
     return col.le(std::forward<T>(val));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator>(const Column<Config>& col, const SqlValue<Config>& val) {
     return col.gt(val);
 }
 
-template<typename Config, SqlCompatible T>
+template<QueryConfig Config, SqlCompatible T>
 inline Condition<Config> operator>(const Column<Config>& col, T&& val) {
     return col.gt(std::forward<T>(val));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator>=(const Column<Config>& col, const SqlValue<Config>& val) {
     return col.ge(val);
 }
 
-template<typename Config, SqlCompatible T>
+template<QueryConfig Config, SqlCompatible T>
 inline Condition<Config> operator>=(const Column<Config>& col, T&& val) {
     return col.ge(std::forward<T>(val));
 }
 // new
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 inline Condition<Config> operator==(const TypedColumn<T, Config>& col, const SqlValue<Config>& val) {
     return col.eq(val);
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 inline Condition<Config> operator!=(const TypedColumn<T, Config>& col, const SqlValue<Config>& val) {
     return col.ne(val);
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 inline Condition<Config> operator<(const TypedColumn<T, Config>& col, const SqlValue<Config>& val) {
     return col.lt(val);
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 inline Condition<Config> operator<=(const TypedColumn<T, Config>& col, const SqlValue<Config>& val) {
     return col.le(val);
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 inline Condition<Config> operator>(const TypedColumn<T, Config>& col, const SqlValue<Config>& val) {
     return col.gt(val);
 }
 
-template<typename T, typename Config>
+template<typename T, QueryConfig Config>
 inline Condition<Config> operator>=(const TypedColumn<T, Config>& col, const SqlValue<Config>& val) {
     return col.ge(val);
 }
 
 // Qt type operator overloads
 #ifdef SQLQUERYBUILDER_USE_QT
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator==(const Column<Config>& col, const QString& val) {
     return col.eq(std::string_view(val.toStdString()));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator!=(const Column<Config>& col, const QString& val) {
     return col.ne(std::string_view(val.toStdString()));
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator<(const Column<Config>& col, const QDateTime& val) {
     return col.lt(val);
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator<=(const Column<Config>& col, const QDateTime& val) {
     return col.le(val);
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator>(const Column<Config>& col, const QDateTime& val) {
     return col.gt(val);
 }
 
-template<typename Config>
+template<QueryConfig Config>
 inline Condition<Config> operator>=(const Column<Config>& col, const QDateTime& val) {
     return col.ge(val);
 }
@@ -1342,7 +1342,7 @@ enum class SqlFunction {
 };
 
 // Column reference
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class ColumnRef {
 private:
     std::string_view column_;
@@ -1419,7 +1419,7 @@ public:
 };
 
 // Join class
-template<typename Config>
+template<QueryConfig Config>
 class Join : public JoinBase {
 
 private:
@@ -1463,7 +1463,7 @@ public:
 };
 
 // JoinSubquery class
-template<typename Config>
+template<QueryConfig Config>
 class JoinSubquery : public JoinBase {
 public:
 private:
@@ -1510,7 +1510,7 @@ public:
 };
 
 // Placeholder class to represent a SQL parameter placeholder
-template <typename Config>
+template <QueryConfig Config>
 class Placeholder {
 private:
     std::string name_;
@@ -1555,7 +1555,7 @@ public:
 };
 
 // A class that holds a fluent where builder for complex conditions
-template<typename Config>
+template<QueryConfig Config>
 class WhereBuilder {
 private:
     using ConditionFn = std::function<void(WhereBuilder<Config>&)>;
@@ -1609,7 +1609,7 @@ public:
 };
 
 
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 class QueryBuilder {
 public:
     enum class QueryType : uint8_t { Select, Insert, InsertOrReplace, Update, Delete, Truncate };
@@ -2129,7 +2129,7 @@ public:
         return innerJoin(table, condition.toString());
     }
 
-    template<typename Fn, typename Config=DefaultConfig>
+    template<typename Fn, QueryConfig Config=DefaultConfig>
     QueryBuilder& innerJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
         if (filters_.joins_count >= Config::MaxJoins) {
@@ -2193,7 +2193,7 @@ public:
         return leftJoin(table, condition.toString());
     }
 
-    template<typename Fn, typename Config=DefaultConfig>
+    template<typename Fn, QueryConfig Config=DefaultConfig>
     QueryBuilder& leftJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
         if (filters_.joins_count >= Config::MaxJoins) {
@@ -2257,7 +2257,7 @@ public:
         return rightJoin(table, condition.toString());
     }
 
-    template<typename Fn, typename Config=DefaultConfig>
+    template<typename Fn, QueryConfig Config=DefaultConfig>
     QueryBuilder& rightJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
         if (filters_.joins_count >= Config::MaxJoins) {
@@ -2321,7 +2321,7 @@ public:
         return fullJoin(table, condition.toString());
     }
 
-    template<typename Fn, typename Config=DefaultConfig>
+    template<typename Fn, QueryConfig Config=DefaultConfig>
     QueryBuilder& fullJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
         if (filters_.joins_count >= Config::MaxJoins) {
@@ -2856,34 +2856,34 @@ inline std::string as(std::string_view expr, std::string_view alias) {
 }
 
 // Helper functions
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 [[nodiscard]] constexpr Table<Config> table(std::string_view name) {
     return Table<Config>(name);
 }
 
-template<typename T, typename Config = DefaultConfig>
+template<typename T, QueryConfig Config = DefaultConfig>
 [[nodiscard]] constexpr TypedColumn<T, Config> column(const Table<Config>& table, std::string_view name) {
     return TypedColumn<T, Config>(table.name(), name);
 }
 
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 inline Column<Config> col(std::string_view name) {
     return Column<Config>(name);
 }
 
-template<SqlCompatible T, typename Config = DefaultConfig>
+template<SqlCompatible T, QueryConfig Config = DefaultConfig>
 inline SqlValue<Config> val(T&& value) {
     return SqlValue<Config>(std::forward<T>(value));
 }
 
 // All columns helper
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 inline std::string_view all_of(const Table<Config>&) {
     return keywords::ALL;
 }
 
 // Raw condition helper
-template<typename Config = DefaultConfig>
+template<QueryConfig Config = DefaultConfig>
 inline Condition<Config> raw(std::string_view condition) {
     return Condition<Config>(condition);
 }
