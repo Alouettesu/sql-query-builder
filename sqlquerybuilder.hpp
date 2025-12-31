@@ -172,6 +172,18 @@ struct is_sql_compatible<QDateTime> : std::true_type {};
 template<typename T>
 concept SqlCompatible = is_sql_compatible<std::remove_cvref_t<T>>::value;
 
+template<typename T>
+concept QueryConfig =
+    requires {
+        requires std::same_as<decltype(T::MaxColumns),    const std::size_t>;
+        requires std::same_as<decltype(T::MaxConditions), const std::size_t>;
+        requires std::same_as<decltype(T::MaxJoins),      const std::size_t>;
+        requires std::same_as<decltype(T::MaxOrderBy),    const std::size_t>;
+        requires std::same_as<decltype(T::MaxGroupBy),    const std::size_t>;
+        requires std::same_as<decltype(T::MaxInValues),   const std::size_t>;
+        requires std::same_as<decltype(T::ThrowOnError),  const bool>;
+    };
+
 // Forward declarations
 template<typename Config = DefaultConfig>
 class SqlValue;
@@ -1967,6 +1979,26 @@ public:
         return *this;
     }
 
+    template<typename Col, QueryConfig Config=DefaultConfig>
+    QueryBuilder& value(const Col& column, SqlValue<Config>&& val) {
+        if (columns_.values_count >= Config::MaxColumns) {
+            auto error = QueryError(QueryError::Code::TooManyColumns,
+                                    std::format("Too many values: limit is {}", Config::MaxColumns));
+            last_error_ = error;
+            if constexpr(Config::ThrowOnError) {
+                throw error;
+            }
+            return *this;
+        }
+
+        // Direct assignment of the pair at the current index
+        columns_.values[columns_.values_count].first = static_cast<std::string_view>(column);
+        columns_.values[columns_.values_count].second = std::move(val);
+        columns_.values_count++;
+
+        return *this;
+    }
+
     // Update methods
     template<typename T>
     QueryBuilder& update(const T& table) {
@@ -2001,6 +2033,26 @@ public:
             static_assert(std::is_convertible_v<Col, std::string_view>,
                           "Column type not supported for set");
         }
+        return *this;
+    }
+
+    template<typename Col, QueryConfig Config=DefaultConfig>
+    QueryBuilder& set(const Col& column, SqlValue<Config>&& val) {
+        if (columns_.values_count >= Config::MaxColumns) {
+            auto error = QueryError(QueryError::Code::TooManyColumns,
+                                    std::format("Too many values: limit is {}", Config::MaxColumns));
+            last_error_ = error;
+            if constexpr(Config::ThrowOnError) {
+                throw error;
+            }
+            return *this;
+        }
+
+        // Direct assignment of the pair at the current index
+        columns_.values[columns_.values_count].first = static_cast<std::string_view>(column);
+        columns_.values[columns_.values_count].second = std::move(val);
+        columns_.values_count++;
+
         return *this;
     }
 

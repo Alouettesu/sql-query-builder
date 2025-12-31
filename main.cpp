@@ -290,6 +290,15 @@ int main() {
                          .build();
 
         std::cout << query << "\n";
+
+        auto query2 = QueryBuilder()
+                         .insert("users"sv)
+                         .value("name"sv, ph("name"))
+                         .value("email"sv, ph("email"))
+                         .value("active"sv, true)
+                         .value("status"sv, ph("status"))
+                         .build();
+        std::cout << query2 << std::endl;
     }
 
     // Insert query with typed interface
@@ -684,6 +693,20 @@ int main() {
                           .build();
 
         std::cout << query2 << std::endl;
+
+        auto query3 = QueryBuilder()
+                          .update("users"sv)
+                          .set("email"sv, ph(":email"))
+                          .where(users.id == ph(":id"))
+                          .build();
+        std::cout << query3 << std::endl;
+
+        auto query4 = QueryBuilder()
+                         .deleteFrom("users"sv)
+                         .where(col("status") == ph("status"))
+                         .build();
+
+        std::cout << query4 << "\n";
     }
 
     {
