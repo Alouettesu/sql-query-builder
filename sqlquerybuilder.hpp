@@ -1989,13 +1989,13 @@ public:
         return *this;
     }
 
-    template<typename Col, QueryConfig Config=DefaultConfig>
+    template<typename Col, QueryConfig Conf=DefaultConfig>
     QueryBuilder& value(const Col& column, SqlValue<Config>&& val) {
-        if (columns_.values_count >= Config::MaxColumns) {
+        if (columns_.values_count >= Conf::MaxColumns) {
             auto error = QueryError(QueryError::Code::TooManyColumns,
-                                    std::format("Too many values: limit is {}", Config::MaxColumns));
+                                    std::format("Too many values: limit is {}", Conf::MaxColumns));
             last_error_ = error;
-            if constexpr(Config::ThrowOnError) {
+            if constexpr(Conf::ThrowOnError) {
                 throw error;
             }
             return *this;
@@ -2046,13 +2046,13 @@ public:
         return *this;
     }
 
-    template<typename Col, QueryConfig Config=DefaultConfig>
-    QueryBuilder& set(const Col& column, SqlValue<Config>&& val) {
+    template<typename Col, QueryConfig Conf=DefaultConfig>
+    QueryBuilder& set(const Col& column, SqlValue<Conf>&& val) {
         if (columns_.values_count >= Config::MaxColumns) {
             auto error = QueryError(QueryError::Code::TooManyColumns,
-                                    std::format("Too many values: limit is {}", Config::MaxColumns));
+                                    std::format("Too many values: limit is {}", Conf::MaxColumns));
             last_error_ = error;
-            if constexpr(Config::ThrowOnError) {
+            if constexpr(Conf::ThrowOnError) {
                 throw error;
             }
             return *this;
@@ -2131,24 +2131,24 @@ public:
         return innerJoin(table, condition.toString());
     }
 
-    template<typename Fn, QueryConfig Config=DefaultConfig>
+    template<typename Fn, QueryConfig Conf=DefaultConfig>
     QueryBuilder& innerJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
-        if (filters_.joins_count >= Config::MaxJoins) {
+        if (filters_.joins_count >= Conf::MaxJoins) {
             auto error = QueryError(QueryError::Code::TooManyJoins,
-                                    std::format("Too many joins: limit is {}", Config::MaxJoins));
+                                    std::format("Too many joins: limit is {}", Conf::MaxJoins));
             last_error_ = error;
-            if constexpr(Config::ThrowOnError) {
+            if constexpr(Conf::ThrowOnError) {
                 throw error;
             }
             return *this;
         }
 
-        QueryBuilder<Config> builder;
+        QueryBuilder<Conf> builder;
         builderFn(builder);
         Result<std::string> r = builder.buildResult();
         std::string subquery = r.value();
-        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Config>>(
+        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Conf>>(
             JoinBase::Type::Inner,
             subquery,
             alias,
@@ -2195,24 +2195,24 @@ public:
         return leftJoin(table, condition.toString());
     }
 
-    template<typename Fn, QueryConfig Config=DefaultConfig>
+    template<typename Fn, QueryConfig Conf=DefaultConfig>
     QueryBuilder& leftJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
-        if (filters_.joins_count >= Config::MaxJoins) {
+        if (filters_.joins_count >= Conf::MaxJoins) {
             auto error = QueryError(QueryError::Code::TooManyJoins,
-                                    std::format("Too many joins: limit is {}", Config::MaxJoins));
+                                    std::format("Too many joins: limit is {}", Conf::MaxJoins));
             last_error_ = error;
-            if constexpr(Config::ThrowOnError) {
+            if constexpr(Conf::ThrowOnError) {
                 throw error;
             }
             return *this;
         }
 
-        QueryBuilder<Config> builder;
+        QueryBuilder<Conf> builder;
         builderFn(builder);
         Result<std::string> r = builder.buildResult();
         std::string subquery = r.value();
-        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Config>>(
+        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Conf>>(
             JoinBase::Type::Left,
             subquery,
             alias,
@@ -2259,24 +2259,24 @@ public:
         return rightJoin(table, condition.toString());
     }
 
-    template<typename Fn, QueryConfig Config=DefaultConfig>
+    template<typename Fn, QueryConfig Conf=DefaultConfig>
     QueryBuilder& rightJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
-        if (filters_.joins_count >= Config::MaxJoins) {
+        if (filters_.joins_count >= Conf::MaxJoins) {
             auto error = QueryError(QueryError::Code::TooManyJoins,
-                                    std::format("Too many joins: limit is {}", Config::MaxJoins));
+                                    std::format("Too many joins: limit is {}", Conf::MaxJoins));
             last_error_ = error;
-            if constexpr(Config::ThrowOnError) {
+            if constexpr(Conf::ThrowOnError) {
                 throw error;
             }
             return *this;
         }
 
-        QueryBuilder<Config> builder;
+        QueryBuilder<Conf> builder;
         builderFn(builder);
         Result<std::string> r = builder.buildResult();
         std::string subquery = r.value();
-        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Config>>(
+        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Conf>>(
             JoinBase::Type::Right,
             subquery,
             alias,
@@ -2323,24 +2323,24 @@ public:
         return fullJoin(table, condition.toString());
     }
 
-    template<typename Fn, QueryConfig Config=DefaultConfig>
+    template<typename Fn, QueryConfig Conf=DefaultConfig>
     QueryBuilder& fullJoin(Fn builderFn, std::string_view alias, std::string_view condition) {
         static_assert((QueryType::Select == QueryType::Select), "JOIN can only be used with SELECT queries");
         if (filters_.joins_count >= Config::MaxJoins) {
             auto error = QueryError(QueryError::Code::TooManyJoins,
-                                    std::format("Too many joins: limit is {}", Config::MaxJoins));
+                                    std::format("Too many joins: limit is {}", Conf::MaxJoins));
             last_error_ = error;
-            if constexpr(Config::ThrowOnError) {
+            if constexpr(Conf::ThrowOnError) {
                 throw error;
             }
             return *this;
         }
 
-        QueryBuilder<Config> builder;
+        QueryBuilder<Conf> builder;
         builderFn(builder);
         Result<std::string> r = builder.buildResult();
         std::string subquery = r.value();
-        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Config>>(
+        filters_.joins[filters_.joins_count++] = std::make_unique<JoinSubquery<Conf>>(
             JoinBase::Type::Full,
             subquery,
             alias,
