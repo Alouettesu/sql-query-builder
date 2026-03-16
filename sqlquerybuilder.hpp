@@ -374,6 +374,8 @@ public:
     }
 };
 
+struct RawExpression { std::string expr; };
+
 // SqlValue class with type-safe storage
 template<QueryConfig Config>
 class SqlValue {
@@ -384,7 +386,8 @@ public:
         double,
         bool,
         std::string_view,
-        Placeholder<Config>
+        Placeholder<Config>,
+        RawExpression
 #ifdef SQLQUERYBUILDER_USE_QT
         ,QString
         ,QDateTime
@@ -422,6 +425,7 @@ public:
         }
     }
     explicit SqlValue(Placeholder<Config> placeholder) : storage_(placeholder) {}
+    explicit SqlValue(RawExpression expression) : storage_(expression) {}
 
 
     static std::string escapeString(std::string_view str) {
@@ -457,6 +461,8 @@ public:
                 return escapeString(value);
             } else if constexpr(std::is_same_v<T, Placeholder<Config>>) {
                 return value.toString();
+            } else if constexpr(std::is_same_v<T, RawExpression>) {
+                return value.expr;
 #ifdef SQLQUERYBUILDER_USE_QT
             } else if constexpr(std::is_same_v<T, QString>) {
                 return escapeString(value.toStdString());
@@ -475,6 +481,11 @@ public:
         return std::holds_alternative<Placeholder<Config>>(storage_);
     }
 };
+
+template<QueryConfig Config = DefaultConfig>
+inline SqlValue<Config> rawExpression(std::string_view expression) {
+    return SqlValue<Config>(RawExpression(std::string(expression)));
+}
 
 template<QueryConfig Config = DefaultConfig>
 inline SqlValue<Config> ph(std::string_view name = "") {

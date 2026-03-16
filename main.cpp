@@ -729,5 +729,14 @@ int main() {
 
         std::cout << query << std::endl;
     }
+    {
+        printSection("Raw expressions");
+        auto query = sql::QueryBuilder()
+            .update("Procedures")
+            .set("deleted_at", sql::rawExpression("unixepoch(datetime('now'))"))
+            .where(sql::col("id") == sql::ph("id"))
+            .build();
+        std::cout << query << std::endl;
+    }
     return 0;
 }
